@@ -111,6 +111,9 @@ build_variant() {
   SPEC_DIR="$base_dir/.specify"
   mkdir -p "$SPEC_DIR"
   
+  # Copy config.json if it exists
+  [[ -f .specify/config.json ]] && { cp .specify/config.json "$SPEC_DIR/"; echo "Copied config.json -> .specify"; }
+
   [[ -d memory ]] && { cp -r memory "$SPEC_DIR/"; echo "Copied memory -> .specify"; }
   
   # Only copy the relevant script variant directory

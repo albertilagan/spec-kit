@@ -76,7 +76,11 @@ try {
 
 Set-Location $repoRoot
 
-$specsDir = Join-Path $repoRoot 'specs'
+# Load common functions to get specs folder from config
+. "$PSScriptRoot/common.ps1"
+
+$specsFolder = Get-SpecsFolder -RepoRoot $repoRoot
+$specsDir = Join-Path $repoRoot $specsFolder
 New-Item -ItemType Directory -Path $specsDir -Force | Out-Null
 
 $highest = 0

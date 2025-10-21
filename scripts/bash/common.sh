@@ -12,6 +12,23 @@ get_repo_root() {
     fi
 }
 
+# Get specs folder from config, with fallback to default
+get_specs_folder() {
+    local repo_root="$1"
+    local config_file="$repo_root/.specify/config.json"
+    local default_folder="specs"
+
+    if [[ -f "$config_file" ]] && command -v jq >/dev/null 2>&1; then
+        local configured_folder=$(jq -r '.specs_folder // "specs"' "$config_file" 2>/dev/null)
+        if [[ -n "$configured_folder" && "$configured_folder" != "null" ]]; then
+            echo "$configured_folder"
+            return
+        fi
+    fi
+
+    echo "$default_folder"
+}
+
 # Get current branch, with fallback for non-git repositories
 get_current_branch() {
     # First check if SPECIFY_FEATURE environment variable is set
@@ -28,7 +45,8 @@ get_current_branch() {
 
     # For non-git repos, try to find the latest feature directory
     local repo_root=$(get_repo_root)
-    local specs_dir="$repo_root/specs"
+    local specs_folder=$(get_specs_folder "$repo_root")
+    local specs_dir="$repo_root/$specs_folder"
 
     if [[ -d "$specs_dir" ]]; then
         local latest_feature=""
@@ -54,7 +72,7 @@ get_current_branch() {
         fi
     fi
 
-    echo "main"  # Final fallback
+    echo "main" # Final fallback
 }
 
 # Check if we have git available
@@ -81,14 +99,20 @@ check_feature_branch() {
     return 0
 }
 
-get_feature_dir() { echo "$1/specs/$2"; }
+get_feature_dir() {
+    local repo_root="$1"
+    local branch="$2"
+    local specs_folder=$(get_specs_folder "$repo_root")
+    echo "$repo_root/$specs_folder/$branch"
+}
 
 # Find feature directory by numeric prefix instead of exact branch match
 # This allows multiple branches to work on the same spec (e.g., 004-fix-bug, 004-add-feature)
 find_feature_dir_by_prefix() {
     local repo_root="$1"
     local branch_name="$2"
-    local specs_dir="$repo_root/specs"
+    local specs_folder=$(get_specs_folder "$repo_root")
+    local specs_dir="$repo_root/$specs_folder"
 
     # Extract numeric prefix from branch (e.g., "004" from "004-whatever")
     if [[ ! "$branch_name" =~ ^([0-9]{3})- ]]; then
@@ -99,7 +123,7 @@ find_feature_dir_by_prefix() {
 
     local prefix="${BASH_REMATCH[1]}"
 
-    # Search for directories in specs/ that start with this prefix
+    # Search for directories in the specs folder that start with this prefix
     local matches=()
     if [[ -d "$specs_dir" ]]; then
         for dir in "$specs_dir"/"$prefix"-*; do
@@ -120,7 +144,7 @@ find_feature_dir_by_prefix() {
         # Multiple matches - this shouldn't happen with proper naming convention
         echo "ERROR: Multiple spec directories found with prefix '$prefix': ${matches[*]}" >&2
         echo "Please ensure only one spec directory exists per numeric prefix." >&2
-        echo "$specs_dir/$branch_name"  # Return something to avoid breaking the script
+        echo "$specs_dir/$branch_name" # Return something to avoid breaking the script
     fi
 }
 
@@ -153,4 +177,3 @@ EOF
 
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
-

@@ -84,7 +84,11 @@ fi
 
 cd "$REPO_ROOT"
 
-SPECS_DIR="$REPO_ROOT/specs"
+# Load common functions to get specs folder from config
+source "$SCRIPT_DIR/common.sh"
+
+SPECS_FOLDER=$(get_specs_folder "$REPO_ROOT")
+SPECS_DIR="$REPO_ROOT/$SPECS_FOLDER"
 mkdir -p "$SPECS_DIR"
 
 HIGHEST=0

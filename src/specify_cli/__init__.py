@@ -515,6 +515,33 @@ def handle_vscode_settings(sub_item, dest_file, rel_path, verbose=False, tracker
         log(f"Warning: Could not merge, copying instead: {e}", "yellow")
         shutil.copy2(sub_item, dest_file)
 
+def handle_config_json(sub_item, dest_file, rel_path, verbose=False, tracker=None) -> None:
+    """Handle merging or copying of .specify/config.json files.
+
+    Merges template config with existing user config, preserving user values.
+    """
+    def log(message, color="green"):
+        if verbose and not tracker:
+            console.print(f"[{color}]{message}[/] {rel_path}")
+
+    try:
+        with open(sub_item, 'r', encoding='utf-8') as f:
+            new_config = json.load(f)
+
+        if dest_file.exists():
+            merged = merge_config_files(dest_file, new_config, verbose=verbose and not tracker)
+            with open(dest_file, 'w', encoding='utf-8') as f:
+                json.dump(merged, f, indent=2)
+                f.write('\n')
+            log("Merged (user values preserved):", "green")
+        else:
+            shutil.copy2(sub_item, dest_file)
+            log("Copied (no existing config.json):", "blue")
+
+    except Exception as e:
+        log(f"Warning: Could not merge, copying instead: {e}", "yellow")
+        shutil.copy2(sub_item, dest_file)
+
 def merge_json_files(existing_path: Path, new_content: dict, verbose: bool = False) -> dict:
     """Merge new JSON content into existing JSON file.
 
@@ -555,6 +582,50 @@ def merge_json_files(existing_path: Path, new_content: dict, verbose: bool = Fal
 
     if verbose:
         console.print(f"[cyan]Merged JSON file:[/cyan] {existing_path.name}")
+
+    return merged
+
+def merge_config_files(existing_path: Path, new_content: dict, verbose: bool = False) -> dict:
+    """Merge config files preserving user values.
+
+    Performs a deep merge where:
+    - New keys from template are added
+    - Existing user values are preserved (user values take precedence)
+    - Nested dictionaries are merged recursively
+
+    This is the opposite priority of merge_json_files - user config wins.
+
+    Args:
+        existing_path: Path to existing config file
+        new_content: New config content from template
+        verbose: Whether to print merge details
+
+    Returns:
+        Merged config content as dict
+    """
+    try:
+        with open(existing_path, 'r', encoding='utf-8') as f:
+            existing_content = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        # If file doesn't exist or is invalid, just use new content
+        return new_content
+
+    def deep_merge_preserve_existing(template: dict, user: dict) -> dict:
+        """Recursively merge, prioritizing user values over template."""
+        result = template.copy()
+        for key, value in user.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                # Recursively merge nested dictionaries
+                result[key] = deep_merge_preserve_existing(result[key], value)
+            else:
+                # User value takes precedence
+                result[key] = value
+        return result
+
+    merged = deep_merge_preserve_existing(new_content, existing_content)
+
+    if verbose:
+        console.print(f"[cyan]Merged config file:[/cyan] {existing_path.name}")
 
     return merged
 
@@ -752,6 +823,9 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, script_
                                         # Special handling for .vscode/settings.json - merge instead of overwrite
                                         if dest_file.name == "settings.json" and dest_file.parent.name == ".vscode":
                                             handle_vscode_settings(sub_item, dest_file, rel_path, verbose, tracker)
+                                        # Special handling for .specify/config.json - merge preserving user values
+                                        elif dest_file.name == "config.json" and dest_file.parent.name == ".specify":
+                                            handle_config_json(sub_item, dest_file, rel_path, verbose, tracker)
                                         else:
                                             shutil.copy2(sub_item, dest_file)
                             else:

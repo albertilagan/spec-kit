@@ -18,15 +18,28 @@ get_specs_folder() {
     local config_file="$repo_root/.specify/config.json"
     local default_folder="specs"
 
-    if [[ -f "$config_file" ]] && command -v jq >/dev/null 2>&1; then
-        local configured_folder=$(jq -r '.specs_folder // "specs"' "$config_file" 2>/dev/null)
-        if [[ -n "$configured_folder" && "$configured_folder" != "null" ]]; then
-            echo "$configured_folder"
-            return
-        fi
+    if [[ ! -f "$config_file" ]]; then
+        echo "$default_folder"
+        return
     fi
 
-    echo "$default_folder"
+    local configured_folder=""
+
+    # Try jq first if available (most reliable)
+    if command -v jq >/dev/null 2>&1; then
+        configured_folder=$(jq -r '.specs_folder // ""' "$config_file" 2>/dev/null)
+    else
+        # Fallback: pure bash JSON parsing (simple key-value extraction)
+        # This handles: "specs_folder": "value" or "specs_folder":"value"
+        configured_folder=$(grep -o '"specs_folder"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null | sed 's/.*"specs_folder"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+    fi
+
+    # Use configured value if valid, otherwise use default
+    if [[ -n "$configured_folder" && "$configured_folder" != "null" ]]; then
+        echo "$configured_folder"
+    else
+        echo "$default_folder"
+    fi
 }
 
 # Get current branch, with fallback for non-git repositories

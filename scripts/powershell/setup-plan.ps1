@@ -31,10 +31,14 @@ if (-not (Test-FeatureBranch -Branch $paths.CURRENT_BRANCH -HasGit $paths.HAS_GI
 # Ensure the feature directory exists
 New-Item -ItemType Directory -Path $paths.FEATURE_DIR -Force | Out-Null
 
-# Copy plan template if it exists, otherwise note it or create empty file
+# Copy plan template if it exists and substitute specs folder
 $template = Join-Path $paths.REPO_ROOT '.specify/templates/plan-template.md'
-if (Test-Path $template) { 
-    Copy-Item $template $paths.IMPL_PLAN -Force
+$specsFolder = Get-SpecsFolder -RepoRoot $paths.REPO_ROOT
+if (Test-Path $template) {
+    # Substitute {SPECS_FOLDER} placeholder with actual specs folder
+    $content = Get-Content $template -Raw
+    $content = $content -replace '\{SPECS_FOLDER\}', $specsFolder
+    Set-Content -Path $paths.IMPL_PLAN -Value $content -NoNewline
     Write-Output "Copied plan template to $($paths.IMPL_PLAN)"
 } else {
     Write-Warning "Plan template not found at $template"

@@ -36,10 +36,12 @@ check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
 # Ensure the feature directory exists
 mkdir -p "$FEATURE_DIR"
 
-# Copy plan template if it exists
+# Copy plan template if it exists and substitute specs folder
 TEMPLATE="$REPO_ROOT/.specify/templates/plan-template.md"
+SPECS_FOLDER=$(get_specs_folder "$REPO_ROOT")
 if [[ -f "$TEMPLATE" ]]; then
-    cp "$TEMPLATE" "$IMPL_PLAN"
+    # Substitute {SPECS_FOLDER} placeholder with actual specs folder
+    sed "s|{SPECS_FOLDER}|$SPECS_FOLDER|g" "$TEMPLATE" > "$IMPL_PLAN"
     echo "Copied plan template to $IMPL_PLAN"
 else
     echo "Warning: Plan template not found at $TEMPLATE"
